@@ -39,6 +39,7 @@ import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import org.apache.rocketmq.client.consumer.listener.MessageListenerConcurrently;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.common.message.MessageExt;
+import org.apache.rocketmq.remoting.protocol.LanguageCode;
 
 public class PushConsumerImpl implements PushConsumer {
     private final DefaultMQPushConsumer rocketmqPushConsumer;
@@ -52,11 +53,13 @@ public class PushConsumerImpl implements PushConsumer {
         this.properties = properties;
         this.clientConfig = BeanUtils.populate(properties, ClientConfig.class);
 
-        String accessPoints = clientConfig.getAccessPoints();
-        if (accessPoints == null || accessPoints.isEmpty()) {
-            throw new OMSRuntimeException("-1", "OMS AccessPoints is null or empty.");
+        if ("true".equalsIgnoreCase(System.getenv("OMS_RMQ_DIRECT_NAME_SRV"))) {
+            String accessPoints = clientConfig.getAccessPoints();
+            if (accessPoints == null || accessPoints.isEmpty()) {
+                throw new OMSRuntimeException("-1", "OMS AccessPoints is null or empty.");
+            }
+            this.rocketmqPushConsumer.setNamesrvAddr(accessPoints.replace(',', ';'));
         }
-        this.rocketmqPushConsumer.setNamesrvAddr(accessPoints.replace(',', ';'));
 
         String consumerGroup = clientConfig.getConsumerId();
         if (null == consumerGroup || consumerGroup.isEmpty()) {
@@ -71,6 +74,7 @@ public class PushConsumerImpl implements PushConsumer {
         String consumerId = OMSUtil.buildInstanceName();
         this.rocketmqPushConsumer.setInstanceName(consumerId);
         properties.put(OMSBuiltinKeys.CONSUMER_ID, consumerId);
+        this.rocketmqPushConsumer.setLanguage(LanguageCode.OMS);
 
         this.rocketmqPushConsumer.registerMessageListener(new MessageListenerImpl());
     }

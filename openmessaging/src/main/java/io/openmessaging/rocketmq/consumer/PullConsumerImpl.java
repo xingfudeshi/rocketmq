@@ -37,6 +37,7 @@ import org.apache.rocketmq.client.log.ClientLogger;
 import org.apache.rocketmq.common.message.MessageExt;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.logging.InternalLogger;
+import org.apache.rocketmq.remoting.protocol.LanguageCode;
 
 public class PullConsumerImpl implements PullConsumer {
     private final DefaultMQPullConsumer rocketmqPullConsumer;
@@ -46,7 +47,7 @@ public class PullConsumerImpl implements PullConsumer {
     private final LocalMessageCache localMessageCache;
     private final ClientConfig clientConfig;
 
-    final static InternalLogger log = ClientLogger.getLog();
+    private final static InternalLogger log = ClientLogger.getLog();
 
     public PullConsumerImpl(final KeyValue properties) {
         this.properties = properties;
@@ -60,11 +61,13 @@ public class PullConsumerImpl implements PullConsumer {
 
         this.rocketmqPullConsumer = pullConsumerScheduleService.getDefaultMQPullConsumer();
 
-        String accessPoints = clientConfig.getAccessPoints();
-        if (accessPoints == null || accessPoints.isEmpty()) {
-            throw new OMSRuntimeException("-1", "OMS AccessPoints is null or empty.");
+        if ("true".equalsIgnoreCase(System.getenv("OMS_RMQ_DIRECT_NAME_SRV"))) {
+            String accessPoints = clientConfig.getAccessPoints();
+            if (accessPoints == null || accessPoints.isEmpty()) {
+                throw new OMSRuntimeException("-1", "OMS AccessPoints is null or empty.");
+            }
+            this.rocketmqPullConsumer.setNamesrvAddr(accessPoints.replace(',', ';'));
         }
-        this.rocketmqPullConsumer.setNamesrvAddr(accessPoints.replace(',', ';'));
 
         this.rocketmqPullConsumer.setConsumerGroup(consumerGroup);
 
@@ -74,6 +77,8 @@ public class PullConsumerImpl implements PullConsumer {
         String consumerId = OMSUtil.buildInstanceName();
         this.rocketmqPullConsumer.setInstanceName(consumerId);
         properties.put(OMSBuiltinKeys.CONSUMER_ID, consumerId);
+
+        this.rocketmqPullConsumer.setLanguage(LanguageCode.OMS);
 
         this.localMessageCache = new LocalMessageCache(this.rocketmqPullConsumer, clientConfig);
     }
